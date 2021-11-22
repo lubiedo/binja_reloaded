@@ -1,9 +1,10 @@
 from __future__ import print_function
 import sys
+import os
 import watchdog.observers
 import watchdog.events
-import os
-
+import importlib
+from types import ModuleType
 
 plugin_dir = os.path.dirname(os.path.dirname(__file__))
 
@@ -42,13 +43,23 @@ class PluginHandler(watchdog.events.PatternMatchingEventHandler):
             mod_name = '.'.join(mod_path[:len(mod_path)-i])
 
             if mod_name in sys.modules:
-                print('reloaded> Reloading "{}"...'.format(mod_name))
+                print(f'reloaded> Reloading "{mod_name}"...')
                 try:
-                    reload(sys.modules[mod_name])
+                    mod = sys.modules[mod_name]
+                    for submod_name in mod.__dir__():
+                        if submod_name.startswith('__') or \
+                           submod_name == 'binaryninja':
+                            continue
+                        if not isinstance(mod.__dict__[submod_name], ModuleType):
+                            continue
+                        submod = importlib.import_module(
+                            f'.{submod_name}', mod_name
+                        )
+                        importlib.reload(submod)
                 except Exception as e:
                     print(e)
             else:
-                print('reloaded> Not reloading "{}"..'.format(mod_name))
+                print(f'reloaded> Not reloading "{mod_name}"...')
 
 
 observer = watchdog.observers.Observer()
